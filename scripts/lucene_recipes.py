@@ -117,7 +117,7 @@ def open_search(root):
         searcher = IndexSearcher(reader)
         parser = MultiFieldQueryParser([*TEXT, "cuisine_hint"], analyzer)
 
-        def search(query, limit=3, max_minutes=None, min_servings=None):
+        def search(query, limit=5, max_minutes=None, min_servings=None):
             if limit < 1:
                 raise ValueError("Limit must be positive")
             builder = BooleanQuery.Builder()

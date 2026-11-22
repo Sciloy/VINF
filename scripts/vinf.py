@@ -69,7 +69,7 @@ def compare(root, queries):
     return output
 
 
-def query_recipes(root, query, methods=METHODS, limit=3, **filters):
+def query_recipes(root, query, methods=METHODS, limit=5, **filters):
     """Vyhľadá obe poradia a doplní celé recepty zo zhodného JSONL."""
     index = load_index(root)
     results = {
@@ -198,10 +198,10 @@ def main():
     query.add_argument("--method", choices=METHODS, default="classic")
     query.add_argument("--limit", type=int, default=5)
     add_filters(query)
-    preview = commands.add_parser("query", help="Prehľadné top 3 pre classic aj smooth")
+    preview = commands.add_parser("query", help="Prehľadné top 5 pre classic aj smooth")
     preview.add_argument("query", nargs="?", help="Bez argumentu sa opýta na dopyt")
     preview.add_argument("--method", choices=(*METHODS, "both"), default="both")
-    preview.add_argument("--limit", type=int, default=3)
+    preview.add_argument("--limit", type=int, default=5)
     add_filters(preview)
     comparison = commands.add_parser("compare")
     comparison.add_argument("queries", nargs="*", default=QUERIES)
@@ -213,13 +213,13 @@ def main():
     commands.add_parser("lucene-index")
     lucene = commands.add_parser("lucene-search")
     lucene.add_argument("query")
-    lucene.add_argument("--limit", type=int, default=3)
+    lucene.add_argument("--limit", type=int, default=5)
     lucene.add_argument("--max-minutes", type=float)
     lucene.add_argument("--min-servings", type=float)
     comparison_view = commands.add_parser("compare-search", help="TF-IDF a PyLucene vedľa seba")
     comparison_view.add_argument("query", nargs="?", help="Bez dopytu spustí interaktívny režim")
     comparison_view.add_argument("--method", choices=METHODS, default="smooth")
-    comparison_view.add_argument("--limit", type=int, default=3)
+    comparison_view.add_argument("--limit", type=int, default=5)
     commands.add_parser("evaluate")
     args = parser.parse_args()
     root = args.root.resolve()

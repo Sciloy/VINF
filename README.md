@@ -6,8 +6,9 @@ Python 3.10+, overené s Python 3.14. Príkazy sa spúšťajú z koreňa projekt
 ## Vyhľadávanie s hotovými indexmi
 
 V repozitári sú dva hotové indexy. Pôvodný index je v `data/index/index.json`
-a PyLucene index je v `data/part2/lucene/`. V PowerShelli z koreňa projektu
-spusť porovnanie so zapnutým Docker Desktop:
+a PyLucene index je v `data/part2/lucene/`. Na ich porovnanie stačí spustený
+Docker Desktop. Obraz `coady/pylucene:9.12.0` už obsahuje PyLucene.
+Príkazy zadaj v PowerShelli z koreňa projektu.
 
 ```powershell
 $mount = "type=bind,source=$((Get-Location).Path),target=/vinf"
@@ -16,8 +17,18 @@ docker run --rm -it --mount $mount -w /vinf --entrypoint python3 $image scripts/
 ```
 
 V porovnaní zadaj napríklad `butter chicken` alebo `tomato soup`.
-Príkaz `:id 282620` otvorí detail receptu. Program pri tomto spustení
-načíta hotové indexy z disku.
+Z každého indexu sa zobrazí najviac päť výsledkov. Príkaz `:id 282620`
+otvorí detail receptu. Program pri tomto spustení načíta hotové indexy z disku.
+
+### Číselné filtre
+
+Príkaz `lucene-search` sa spúšťa priamo z PowerShellu. Nasledujúci príklad
+vyhľadá lievance s celkovým časom najviac 30 minút a aspoň štyrmi porciami.
+Premenné `$mount` a `$image` sú nastavené v bloku vyššie.
+
+```powershell
+docker run --rm --mount $mount -w /vinf --entrypoint python3 $image scripts/vinf.py lucene-search pancakes --max-minutes 30 --min-servings 4
+```
 
 ## Opätovné spracovanie a indexovanie
 
@@ -36,7 +47,10 @@ python -m pip install pyspark==4.1.2
 python scripts/vinf.py spark-join data/wiki/enwiki-20261101-pages-articles-multistream.xml.bz2 --indexed
 ```
 
-## Inštalácia
+## Inštalácia crawlera
+
+Súbor `requirements.txt` je určený pre crawler. Inštalácia PySparku na
+spracovanie dát je uvedená vyššie v časti Opätovné spracovanie a indexovanie.
 
 ```powershell
 python -m venv .venv
@@ -62,7 +76,7 @@ Samostatné kroky: `extract`, `index`, `search`, `compare`.
 Každý `--ingredient` musí byť v zozname surovín. Zápis `15 minutes` v dopyte
 znamená čas najviac 15 minút; nejde o všeobecné rozpoznávanie otázok.
 
-## Top 3 recepty a porovnanie poradia
+## Top 5 receptov a porovnanie poradia
 
 ```powershell
 python scripts/vinf.py query "macaroni cheese"
@@ -70,12 +84,12 @@ python scripts/vinf.py query "chicken 15 minutes" --ingredient chicken
 python scripts/vinf.py query
 ```
 
-`query` zobrazí top 3 pre `classic` aj `smooth` v jednej tabuľke s poradím
+`query` zobrazí top 5 pre `classic` aj `smooth` v jednej tabuľke s poradím
 a skóre. Pod ňou vypíše každý recept iba raz: ID, URL, čas, porcie,
 výťažnosť, kategóriu, hodnotenie, rodinu, všetky suroviny a celý postup.
-Pomlčka znamená, že recept nie je v top 3 danej metódy, nie že sa vôbec nenašiel.
+Pomlčka znamená, že recept nie je v top 5 danej metódy.
 Bez zadaného textu sa príkaz opýta na dopyt. Výpis možno upraviť cez
-`--limit 3`, `--method classic`, `--method smooth` alebo `--method both`.
+`--limit`, `--method classic`, `--method smooth` alebo `--method both`.
 Podporuje rovnaké filtre ako `search`. Iba číta existujúci index a zhodné
 extrahované recepty; neprestavuje index a nemení uložené porovnania.
 

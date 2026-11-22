@@ -1,4 +1,4 @@
-"""Porovnanie top 3 pri už otvorených indexoch."""
+"""Porovnanie výsledkov pri už otvorených indexoch."""
 
 from itertools import zip_longest
 from statistics import median
@@ -157,11 +157,11 @@ def benchmark(lookup, query):
 
 
 def comparison_table(root, index):
-    lines = ["| Dopyt | Index | Top 3 v poradí | Medián (ms) |", "|---|---|---|---:|"]
+    lines = ["| Dopyt | Index | Top 5 v poradí | Medián (ms) |", "|---|---|---|---:|"]
     with open_search(root) as lucene:
         for query in QUERIES:
             for method in ("classic", "smooth"):
-                result = benchmark(lambda q: search(index, q, method, 3), query)
+                result = benchmark(lambda q: search(index, q, method, 5), query)
                 lines.append(f"| {query} | {method} | {result} |")
             lines.append(f"| {query} | PyLucene | {benchmark(lucene, query)} |")
     return "\n".join(lines)
