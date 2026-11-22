@@ -1,5 +1,7 @@
 """Porovnanie výsledkov pri už otvorených indexoch."""
 
+import re
+from argparse import ArgumentError, ArgumentParser
 from itertools import zip_longest
 from statistics import median
 from textwrap import wrap
@@ -9,6 +11,10 @@ from food_crawler.indexing import search
 from lucene_recipes import open_search
 
 QUERIES = ("banana bread", "fluffy pancakes", "macaroni cheese", "apple pie", "butter chicken")
+# Preskočí úvodzovky a escapované znaky, aby filter nerozdelil frázu.
+FILTER_START = re.compile(
+    r'\\.|"(?:[^"\\]|\\.)*"|(?P<option>(?<!\S)--(?:max-minutes|min-servings)(?=\s|=|$))'
+)
 
 
 def wiki_origin(recipe):
@@ -100,6 +106,24 @@ def recipe_details(recipe):
     return "\n".join(lines)
 
 
+def split_query_filters(text):
+    """Oddelí filtre na konci vstupu a zachová syntax dopytu Lucene."""
+    option = next((match for match in FILTER_START.finditer(text) if match.group("option")), None)
+    if option is None:
+        return text, {}
+
+    parser = ArgumentParser(add_help=False, allow_abbrev=False, exit_on_error=False)
+    parser.add_argument("--max-minutes", type=float)
+    parser.add_argument("--min-servings", type=float)
+    try:
+        filters, extra = parser.parse_known_args(text[option.start():].split())
+    except ArgumentError as error:
+        raise ValueError(str(error)) from error
+    if extra:
+        raise ValueError("Za dopytom použi iba --max-minutes alebo --min-servings s číslom.")
+    return text[:option.start()].rstrip(), vars(filters)
+
+
 def compare_queries(root, index, query, method, limit):
     if limit < 1:
         raise ValueError("Limit must be positive")
@@ -113,8 +137,9 @@ def compare_queries(root, index, query, method, limit):
                 print(recipe_details(hits[0]) if hits else f"Recept {identifier} sa nenašiel.")
                 return
 
-            old_hits = search(index, text, method, limit)
-            new_hits = lucene(text, limit)
+            query_text, filters = split_query_filters(text)
+            old_hits = search(index, query_text, method, limit, **filters)
+            new_hits = lucene(query_text, limit, **filters)
             details = {row["recipe_id"]: row for row in new_hits}
             old_details = []
             for row in old_hits:
@@ -131,6 +156,7 @@ def compare_queries(root, index, query, method, limit):
             return
 
         print("Zadaj dopyt alebo :id ID_RECEPTU pre suroviny a postup. Prázdny riadok ukončí porovnávanie.")
+        print("Filtre môžeš pridať na koniec dopytu, napríklad pancakes --max-minutes 30 --min-servings 4.")
         while True:
             try:
                 query = input("\nDopyt > ").strip()

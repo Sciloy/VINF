@@ -22,13 +22,14 @@ otvorí detail receptu. Program pri tomto spustení načíta hotové indexy z di
 
 ### Číselné filtre
 
-Príkaz `lucene-search` sa spúšťa priamo z PowerShellu. Nasledujúci príklad
-vyhľadá lievance s celkovým časom najviac 30 minút a aspoň štyrmi porciami.
-Premenné `$mount` a `$image` sú nastavené v bloku vyššie.
+Filtre sa pridávajú na koniec dopytu v riadku `Dopyt >`.
+Platia pre výsledky oboch indexov a dajú sa kombinovať.
 
-```powershell
-docker run --rm --mount $mount -w /vinf --entrypoint python3 $image scripts/vinf.py lucene-search pancakes --max-minutes 30 --min-servings 4
-```
+| Vstup | Výsledok |
+| --- | --- |
+| `pancakes --max-minutes 30` | Lievance s celkovým časom najviac 30 minút. |
+| `butter chicken --min-servings 4` | Výsledky pre `butter chicken` s aspoň štyrmi porciami. |
+| `pancakes --max-minutes 30 --min-servings 4` | Lievance, ktoré spĺňajú obe podmienky. |
 
 ## Opätovné spracovanie a indexovanie
 
