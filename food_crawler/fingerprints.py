@@ -1,4 +1,4 @@
-"""Let Scrapy recognize the same recipe even when its URL slug changes."""
+"""Rozpoznávanie duplicitných URL podľa ID receptu."""
 
 from hashlib import sha256
 
@@ -10,8 +10,12 @@ from food_crawler.spiders.food import recipe_url_details
 class RecipeRequestFingerprinter(RequestFingerprinter):
     def fingerprint(self, request):
         recipe = recipe_url_details(request.url)
-        if recipe is not None and request.method == "GET" and not request.meta.get("redirect_times"):
-            # IDs identify individual Food.com entries, not families of dishes.
+        if (
+            recipe is not None
+            and request.method == "GET"
+            and not request.meta.get("redirect_times")
+        ):
+            # ID identifikuje konkrétny recept.
             return sha256(f"food.com/recipe/{recipe[1]}".encode()).digest()
-        # Let canonical redirects complete even when they keep the recipe ID.
+        # Presmerovanie musí dobehnúť aj pri rovnakom ID.
         return super().fingerprint(request)

@@ -1,0 +1,128 @@
+[
+  {
+    "recipe_id": "17471",
+    "html_sha256": "ed2f3c95eca5219c983a16bd2085e7e26eb8250f0d401f963473c69f35e68716",
+    "reason": "Rozpor v zdroji: HTML uvádza 2 šálky cíceru, JSON-LD 4 šálky alebo 2 konzervy. Recept je uložený v karanténe.",
+    "reviewed_at": "2026-10-24T20:24:22.871388+00:00",
+    "quarantine_file": "data/quarantine/17471.html"
+  },
+  {
+    "recipe_id": "318998",
+    "html_sha256": "9041380935e8aa7864ed2b2330bbbe873537eaff207fc117c9c09ab00177c788",
+    "reason": "Rozpor v zdroji: HTML uvádza 1 uncu húb, JSON-LD 8 uncí alebo 1 konzervu. Recept je uložený v karanténe.",
+    "reviewed_at": "2026-10-24T21:20:24.631831+00:00",
+    "quarantine_file": "data/quarantine/318998.html"
+  },
+  {
+    "recipe_id": "7968",
+    "html_sha256": "5ea6b11c95b550d71f7c031a884a7593f622ab0b033b1b32469caf8d23de3e8a",
+    "reason": "Rozpor v zdroji: HTML uvádza 2 šálky fazule, JSON-LD 4 šálky alebo 2 konzervy. Recept je uložený v karanténe.",
+    "reviewed_at": "2026-10-24T21:20:24.639912+00:00",
+    "quarantine_file": "data/quarantine/7968.html"
+  },
+  {
+    "recipe_id": "94031",
+    "html_sha256": "d338421f0f54c1b38120696240163ceb5b9ad4a95d30abd8864ac62ea2eb5636",
+    "reason": "Rozpor v zdroji: množstvo v samostatnom HTML prvku je 1, text suroviny aj JSON-LD uvádzajú 2 rožky. Recept je uložený v karanténe.",
+    "reviewed_at": "2026-10-24T23:19:58.640555+00:00",
+    "quarantine_file": "data/quarantine/94031.html"
+  },
+  {
+    "recipe_id": "504427",
+    "html_sha256": "c6b4752a5674e3894a0a797da545dec6d01a45855afa57a7c5f1ee133c45964f",
+    "reason": "Rozpor v zdroji: HTML uvádza 6 quart paradajkového pretlaku, JSON-LD 1 quart alebo 6 konzerv. Recept je uložený v karanténe.",
+    "reviewed_at": "2026-10-25T14:28:19.818245+00:00",
+    "quarantine_file": "data/quarantine/504427.html"
+  },
+  {
+    "recipe_id": "80306",
+    "html_sha256": "af1534bd5ddedca69c5025efa294bc1d8420b77d5094700b8f11439931a93bb7",
+    "reason": "Rozpor v zdroji: HTML uvádza 2 lb krabieho mäsa, JSON-LD 1/2 lb alebo 2 konzervy. Recept je uložený v karanténe.",
+    "reviewed_at": "2026-10-25T14:50:35.455502+00:00",
+    "quarantine_file": "data/quarantine/80306.html"
+  },
+  {
+    "recipe_id": "55786",
+    "html_sha256": "757004701d7381ec62df9a3227d1bf2d54115a0d691482e4ba4abb608e3b626c",
+    "reason": "Rozpor v zdroji: HTML uvádza 1 šálku okry, JSON-LD 2 šálky alebo 1 balenie. Recept je uložený v karanténe.",
+    "reviewed_at": "2026-10-25T15:00:46.776673+00:00",
+    "quarantine_file": "data/quarantine/55786.html"
+  },
+  {
+    "recipe_id": "80536",
+    "html_sha256": "1e3e602b519596e2f61d77f95d2fa4f7c18d1944224db31edd71e8fdba3f8283",
+    "reason": "Poškodené kódovanie v pôvodnom zdroji: dva kroky obsahujú sautï¿½ namiesto úplného slova. Znak v poškodenej sekvencii vyzerá ako zlomok a jeho normalizácia mení text. Pôvodné znenie nemožno spoľahlivo určiť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-25T16:33:56.848411+00:00",
+    "quarantine_file": "data/quarantine/80536.html"
+  },
+  {
+    "recipe_id": "104212",
+    "html_sha256": "672aa6b7a705429e2e3b04f8b742f5f93871f8678f29c8941ce006f7feddca1a",
+    "reason": "Rozpor v zdroji: viditeľné HTML uvádza 1 šálku čerstvej poblano papriky, JSON-LD uvádza 1/2 šálky alebo 1 konzervu chilli. Správne množstvo nemožno spoľahlivo určiť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-25T18:03:06.143464+00:00",
+    "quarantine_file": "data/quarantine/104212.html"
+  },
+  {
+    "recipe_id": "231859",
+    "html_sha256": "8ab5a4e7e243be04c7a1d1faba43c80918fd0e6a5353c730f069adb96d4efce1",
+    "reason": "Rozpor v zdroji: HTML uvádza 1 šálku kidney beans, JSON-LD 2 šálky alebo 1 konzervu. Správne množstvo nemožno spoľahlivo určiť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-25T21:23:50.965800+00:00",
+    "quarantine_file": "data/quarantine/231859.html"
+  },
+  {
+    "recipe_id": "227173",
+    "html_sha256": "4ff5f5c87b937d889a6a3f231c6a55839e2540998995fd661c9313cdee2b27b2",
+    "reason": "Rozpor v zdroji: HTML uvádza 1 čerstvý ananás, JSON-LD 1/4 ananásu alebo 1 konzervu. Správne množstvo nemožno spoľahlivo určiť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-25T22:36:30.409739+00:00",
+    "quarantine_file": "data/quarantine/227173.html"
+  },
+  {
+    "recipe_id": "181981",
+    "html_sha256": "150393bd4b157e1dccec327d91865a71eb234e1353fee91819b6382b74799cc1",
+    "reason": "Poškodené kódovanie v pôvodnom HTML aj JSON-LD: krok obsahuje Itï¿½s. Poškodená sekvencia obsahuje znak vyzerajúci ako zlomok a normalizácia by vložila 1/2 do slova. Pôvodný znak nemožno spoľahlivo obnoviť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-25T23:16:35.700113+00:00",
+    "quarantine_file": "data/quarantine/181981.html"
+  },
+  {
+    "recipe_id": "148312",
+    "html_sha256": "29368ae91dcb22bbb11f3da71c4701f9dc9e7c3bcf38a6a4751b7030787dc5f3",
+    "reason": "Rozpor v zdroji: HTML uvádza 2 šálky hnedého cukru, JSON-LD 1 1/2 šálky alebo 2 kusy piloncillo. Správne množstvo nemožno spoľahlivo určiť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-25T23:36:18.225806+00:00",
+    "quarantine_file": "data/quarantine/148312.html"
+  },
+  {
+    "recipe_id": "511913",
+    "html_sha256": "27bf85f60ac91766c961ad0d09f71994148c359f60c9e5a4270ec98f5db36d3b",
+    "reason": "Neúplný pôvodný recept: HTML obsahuje Ingredients: 0 a prázdny ingredient-list; JSON-LD má recipeIngredient: []. Názov a 8 krokov sú prítomné. Ide o chýbajúce údaje zdroja, nie ochrannú stránku ani chybu REGEX. Pôvodná odpoveď je zachovaná v errors aj v karanténe.",
+    "reviewed_at": "2026-10-26T00:27:32.633423+00:00",
+    "quarantine_file": "data/quarantine/511913.html"
+  },
+  {
+    "recipe_id": "81722",
+    "html_sha256": "b131325332087145f32af9688f9fc478010fade544951edbf0ee7ab6878306e3",
+    "reason": "Rozpor množstiev už v zdrojovom HTML: ingredient-quantity uvádza 1/2, ale ingredient-text obsahuje 16 dried shiitake mushrooms aj alternatívu 16 dried Chinese mushrooms. JSON-LD uvádza 16 húb. Vzájomne nesúladné číselné údaje nemožno spoľahlivo spojiť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-26T01:57:03.705833+00:00",
+    "quarantine_file": "data/quarantine/81722.html"
+  },
+  {
+    "recipe_id": "409573",
+    "html_sha256": "25bd1bd16634b9d885ff6ceeff14de227a6992121ff6bc2b372af7c7a6363685",
+    "reason": "Poškodené kódovanie v pôvodnom HTML aj JSON-LD: dva kroky obsahujú gentlyï¿½ a thinnerï¿½. Poškodená sekvencia obsahuje znak vyzerajúci ako zlomok a normalizácia by vložila 1/2 do textu. Pôvodný znak nemožno spoľahlivo obnoviť; zdroj je zachovaný v karanténe.",
+    "reviewed_at": "2026-10-26T02:16:39.752289+00:00",
+    "quarantine_file": "data/quarantine/409573.html"
+  },
+  {
+    "recipe_id": "292268",
+    "html_sha256": "60de59d3402f28bed5b229ab9bb01530dff38e1d7018b979fc6011cac6aae1cd",
+    "reason": "Povodny zdroj uvadza v HTML quantity 1 cup fresh mushrooms, ale JSON-LD 1/2 cup fresh mushrooms; rozpor mnozstva nemoze extraktor jednoznacne vyriesit.",
+    "reviewed_at": "2026-10-26T10:31:55.124727+00:00",
+    "quarantine_file": "data/quarantine/292268.html"
+  },
+  {
+    "recipe_id": "305594",
+    "html_sha256": "faec0594c6b256221bfc42ba1953481d543bfa8345d8ce7c7670fc1ac6a6a25a",
+    "reason": "Povodny zdroj uvadza v HTML quantity 1 lb dried white beans, ale JSON-LD 1/2 lb dried white beans. Rozpor mnozstva zdroja nie je mozne jednoznacne vyriesit; original je zachovany v karantene.",
+    "reviewed_at": "2026-10-26T11:16:20.992678+00:00",
+    "quarantine_file": "data/quarantine/305594.html"
+  }
+]

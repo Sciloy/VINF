@@ -1,1 +1,1 @@
-"""Minimal Scrapy project for saving raw Food.com recipe pages."""
+"""Crawler, extraktor a indexer receptov."""

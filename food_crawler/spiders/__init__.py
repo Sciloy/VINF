@@ -1,1 +1,1 @@
-"""Spiders available to the Scrapy project."""
+"""Scrapy spider pre Food.com."""
