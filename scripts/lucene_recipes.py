@@ -8,6 +8,12 @@ from food_crawler.dataset import read_jsonl
 from cuisine_hints import cuisine_query, recipe_cuisines
 
 TEXT = ("title", "ingredients", "instructions", "wiki_title", "country", "region", "cuisine", "type", "wiki_ingredients")
+SOURCE_LABELS = {"foodcom": "Food.com", "both": "Food.com + Wikipédia", "wikipedia": "Wikipédia"}
+
+
+def recipe_source(row):
+    # Uložené dokumenty zo staršieho indexu nemajú pole source.
+    return row.get("source") or ("both" if row.get("wiki_id") is not None else "foodcom")
 
 
 def ranked_query(query):
@@ -56,6 +62,7 @@ def build(root):
         try:
             ids = set()
             cuisine_counts = {}
+            source_counts = dict.fromkeys(SOURCE_LABELS, 0)
             for row in read_jsonl(source):
                 identifier = row["recipe_id"]
                 if identifier in ids:
@@ -63,8 +70,12 @@ def build(root):
                 ids.add(identifier)
                 doc = Document()
                 doc.add(StringField("recipe_id", identifier, Field.Store.YES))
+                origin = recipe_source(row)
+                doc.add(StringField("source", origin, Field.Store.NO))
+                source_counts[origin] += 1
                 cuisines = recipe_cuisines(row)
-                doc.add(StoredField("recipe", json.dumps({**row, "cuisine_hints": cuisines}, ensure_ascii=False)))
+                doc.add(StoredField("recipe", json.dumps({**row, "source": origin, "cuisine_hints": cuisines},
+                                                         ensure_ascii=False)))
                 wiki_status = "with_wiki_article" if row.get("wiki_id") is not None else "without_wiki_article"
                 for cuisine in cuisines:
                     doc.add(StringField("cuisine_hint", cuisine, Field.Store.NO))
@@ -89,7 +100,8 @@ def build(root):
             writer.rollback()
             raise
         writer.close()
-        return {"indexed_recipes": len(ids), "cuisine_counts": dict(sorted(cuisine_counts.items()))}
+        return {"indexed_recipes": len(ids), "source_counts": source_counts,
+                "cuisine_counts": dict(sorted(cuisine_counts.items()))}
     finally:
         analyzer.close()
         directory.close()
@@ -102,9 +114,9 @@ def open_search(root):
     from java.nio.file import Paths
     from org.apache.lucene.analysis.standard import StandardAnalyzer
     from org.apache.lucene.document import DoublePoint
-    from org.apache.lucene.index import DirectoryReader
+    from org.apache.lucene.index import DirectoryReader, Term
     from org.apache.lucene.queryparser.classic import MultiFieldQueryParser, QueryParserBase
-    from org.apache.lucene.search import BooleanClause, BooleanQuery, IndexSearcher, MatchAllDocsQuery
+    from org.apache.lucene.search import BooleanClause, BooleanQuery, IndexSearcher, MatchAllDocsQuery, TermQuery
     from org.apache.lucene.store import FSDirectory
 
     directory = FSDirectory.open(Paths.get(str(root / "data/part2/lucene")))
@@ -117,7 +129,7 @@ def open_search(root):
         searcher = IndexSearcher(reader)
         parser = MultiFieldQueryParser([*TEXT, "cuisine_hint"], analyzer)
 
-        def search(query, limit=5, max_minutes=None, min_servings=None):
+        def search(query, limit=5, max_minutes=None, min_servings=None, source=None):
             if limit < 1:
                 raise ValueError("Limit must be positive")
             builder = BooleanQuery.Builder()
@@ -126,6 +138,8 @@ def open_search(root):
             except JavaError as exc:
                 raise ValueError(f"Neplatný dopyt pre PyLucene: {query}") from exc
             builder.add(parsed, BooleanClause.Occur.MUST)
+            if source:
+                builder.add(TermQuery(Term("source", source)), BooleanClause.Occur.FILTER)
             for field, lower, upper in (("total_time_minutes", 0., max_minutes), ("servings", min_servings, float("inf"))):
                 if lower is not None and upper is not None:
                     builder.add(DoublePoint.newRangeQuery(field, float(lower), float(upper)), BooleanClause.Occur.FILTER)

@@ -8,8 +8,10 @@ import re
 from shutil import copyfileobj
 from tempfile import NamedTemporaryFile
 from urllib.request import Request, urlopen
+from xml.etree import ElementTree
 
 from spark_recipes import ALIASES
+from wiki_fields import article_links
 from wiki_matching import read_recipe_candidates, title_key
 
 
@@ -22,6 +24,12 @@ PAGE = re.compile(
     re.DOTALL,
 )
 REDIRECT_ELEMENT = re.compile(br'<redirect\s+title="([^"]+)"')
+FOOD_LISTS = (
+    "List of breads", "List of chicken dishes", "List of cookies", "List of desserts",
+    "List of dumplings", "List of egg dishes", "List of noodle dishes", "List of pancakes",
+    "List of pastries", "List of potato dishes", "List of rice dishes", "List of sandwiches",
+    "List of soups", "List of stews",
+)
 
 
 def recipe_keys(recipes):
@@ -90,34 +98,46 @@ def selected_blocks(index_path, keys, dump_size):
         yield offset, dump_size, ids
 
 
-def candidate_xml(dump, recipes, site=SITE, user_agent=USER_AGENT):
-    index_path, dump_hash = fetch_title_index(dump, site, user_agent)
+def candidate_xml(dump, recipes, site=SITE, user_agent=USER_AGENT, index_path=None):
+    if index_path is None:
+        local_index = dump.with_name(dump.name.removesuffix(DUMP_SUFFIX) + INDEX_SUFFIX)
+        index_path = local_index if local_index.is_file() else fetch_title_index(dump, site, user_agent)[0]
+    index_path = index_path.resolve(strict=True)
+    list_keys = {title_key(title) for title in FOOD_LISTS}
     keys = recipe_keys(recipes)
-    key_hash = hashlib.sha256("\n".join(sorted(keys)).encode("utf-8")).hexdigest()
-    output = dump.parent / f"{dump_hash}.{key_hash[:16]}.redirects.candidates.xml"
+    fingerprint = [*sorted(keys | list_keys)]
+    for path in (dump, index_path):
+        info = path.stat()
+        fingerprint.extend([path.name, str(info.st_size), str(info.st_mtime_ns)])
+    key_hash = hashlib.sha256("\n".join(fingerprint).encode("utf-8")).hexdigest()
+    output = dump.parent / f"{key_hash[:16]}.outer-v2.candidates.xml"
     if output.is_file():
         print(f"Using existing Wikipedia candidates: {output.name}", flush=True)
         return output
 
-    print(f"Looking up {len(keys)} recipe names and aliases in the title index", flush=True)
+    print(f"Looking up {len(keys)} recipe titles and {len(list_keys)} Wikipedia food lists", flush=True)
+    keys.update(list_keys)
     size = dump.stat().st_size
     temporary = None
+    written = set()
+    lists_read = set()
     try:
         with dump.open("rb") as source, NamedTemporaryFile(mode="wb", dir=dump.parent, delete=False) as target:
             temporary = Path(target.name)
             target.write(b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<mediawiki>\n")
             requested = set()
-            for round_number in range(3):
+            # Food lists can redirect before yielding their links. Those linked pages can redirect too.
+            for round_number in range(5):
                 if not keys:
                     break
                 requested.update(keys)
                 if round_number:
-                    print(f"Looking up {len(keys)} Wikipedia redirect targets", flush=True)
+                    print(f"Looking up {len(keys)} linked Wikipedia titles and redirects", flush=True)
                 blocks = list(selected_blocks(index_path, keys, size))
                 if not blocks and round_number == 0:
                     raise ValueError("The Wikipedia title index contains no candidate pages")
                 print(f"Reading {len(blocks)} Wikipedia blocks (pass {round_number + 1})", flush=True)
-                redirect_targets = set()
+                next_keys = set()
                 for number, (start, end, expected_ids) in enumerate(blocks, 1):
                     if not 0 <= start < end <= size:
                         raise ValueError(f"Invalid dump offsets: {start}–{end}")
@@ -126,21 +146,37 @@ def candidate_xml(dump, recipes, site=SITE, user_agent=USER_AGENT):
                     found_ids = set()
                     for page in PAGE.finditer(block):
                         page_id = int(page[1])
-                        if page_id in expected_ids:
-                            found_ids.add(page_id)
-                            raw_page = page[0]
+                        if page_id not in expected_ids:
+                            continue
+                        found_ids.add(page_id)
+                        raw_page = page[0]
+                        header = raw_page.split(b"<revision>", 1)[0]
+                        start_title = header.index(b"<title>") + len(b"<title>")
+                        title = title_key(html.unescape(header[start_title:header.index(b"</title>")].decode("utf-8")))
+                        list_page = title in list_keys
+                        if redirect := REDIRECT_ELEMENT.search(header):
+                            destination = title_key(html.unescape(redirect[1].decode("utf-8")).split("#", 1)[0])
+                            next_keys.add(destination)
+                            if list_page:
+                                list_keys.add(destination)
+                        elif list_page:
+                            tree = ElementTree.fromstring(raw_page)
+                            links = article_links(tree.findtext("revision/text"))
+                            next_keys.update(title_key(link) for link in links)
+                            lists_read.add(title)
+                        if page_id not in written:
                             target.write(raw_page + b"\n")
-                            header = raw_page.split(b"<revision>", 1)[0]
-                            if redirect := REDIRECT_ELEMENT.search(header):
-                                title = html.unescape(redirect[1].decode("utf-8")).split("#", 1)[0]
-                                redirect_targets.add(title_key(title))
+                            written.add(page_id)
                     if found_ids != expected_ids:
                         raise ValueError(f"Dump does not match the title index at byte {start}")
                     if number % 50 == 0 or number == len(blocks):
                         print(f"Wikipedia blocks read: {number}/{len(blocks)}", flush=True)
-                keys = redirect_targets - requested
+                keys = next_keys - requested
             target.write(b"</mediawiki>\n")
+        if not lists_read:
+            raise ValueError("No Wikipedia food list could be read from this dump")
         temporary.replace(output)
+        print(f"Read {len(lists_read)} Wikipedia food lists and collected {len(written)} candidate pages", flush=True)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)

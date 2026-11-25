@@ -1,0 +1,38 @@
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/">
+  <page>
+    <title>Pancake</title><ns>0</ns><id>1</id>
+    <revision><id>101</id><text xml:space="preserve">{{Infobox food
+| type = [[Batter (cooking)|Batter]] dish
+| main_ingredient = Flour
+}}</text></revision>
+  </page>
+  <page>
+    <title>Banana bread</title><ns>0</ns><id>2</id>
+    <revision><id>102</id><text xml:space="preserve">{{Infobox food
+| type = Quick bread
+| main_ingredient = [[Banana]]
+}}</text></revision>
+  </page>
+  <page>
+    <title>Banana Bread</title><ns>0</ns><id>5</id>
+    <revision><id>105</id><text>#REDIRECT [[Banana bread]]</text></revision>
+  </page>
+  <page>
+    <title>Test herb dumpling</title><ns>0</ns><id>3</id>
+    <revision><id>103</id><text xml:space="preserve">{{Infobox food
+| type = Dumpling
+| main_ingredient = [[Flour]], parsley
+}}
+'''Test herb dumpling''' is a small dish made from flour and parsley.
+
+== Preparation ==
+Mix the flour with water and chopped [[parsley]], then boil the dumplings until they float.&lt;ref&gt;Sample&lt;/ref&gt;
+
+== History ==
+The test article is only for checking the outer join.</text></revision>
+  </page>
+  <page>
+    <title>Test dessert with no method</title><ns>0</ns><id>4</id>
+    <revision><id>104</id><text xml:space="preserve">{{Infobox food|type=Dessert}}</text></revision>
+  </page>
+</mediawiki>

@@ -8,13 +8,15 @@ from textwrap import wrap
 from time import perf_counter_ns
 
 from food_crawler.indexing import search
-from lucene_recipes import open_search
+from lucene_recipes import SOURCE_LABELS, open_search, recipe_source
 
 QUERIES = ("banana bread", "fluffy pancakes", "macaroni cheese", "apple pie", "butter chicken")
 # Preskočí úvodzovky a escapované znaky, aby filter nerozdelil frázu.
 FILTER_START = re.compile(
     r'\\.|"(?:[^"\\]|\\.)*"|(?P<option>(?<!\S)--(?:max-minutes|min-servings)(?=\s|=|$))'
 )
+# Python pri čítaní terminálu takto označuje bajty, ktoré nedokázal dekódovať.
+UNDECODABLE_INPUT_BYTES = dict.fromkeys(range(0xDC80, 0xDD00))
 
 
 def wiki_origin(recipe):
@@ -28,6 +30,7 @@ def describe_hit(hit):
     if hit is None:
         return ["—"]
     lines = [f"[{hit['recipe_id']}] {hit['title']}"]
+    lines.append(SOURCE_LABELS[recipe_source(hit)])
     minutes = hit.get("total_time_minutes")
     servings = hit.get("servings")
     facts = []
@@ -66,7 +69,11 @@ def side_by_side(old_hits, new_hits, method):
 
 
 def recipe_details(recipe):
-    lines = ["", f"[{recipe['recipe_id']}] {recipe['title']}", recipe["url"]]
+    source = recipe_source(recipe)
+    wiki_only = source == "wikipedia"
+    lines = ["", f"[{recipe['recipe_id']}] {recipe['title']}", f"Zdroj: {SOURCE_LABELS[source]}"]
+    if not wiki_only:
+        lines.append(recipe["url"])
     if recipe.get("total_time_minutes") is not None:
         lines.append(f"Celkový čas: {recipe['total_time_minutes']:g} min")
     if recipe.get("servings") is not None:
@@ -99,10 +106,16 @@ def recipe_details(recipe):
     elif not recipe.get("wiki_title"):
         lines.append("Kuchyňu sa z dostupných údajov nepodarilo určiť.")
 
-    lines.extend(["", "Suroviny"])
-    lines.extend(f"- {ingredient}" for ingredient in recipe.get("ingredients", []))
-    lines.extend(["", "Postup"])
-    lines.extend(f"{step}. {text}" for step, text in enumerate(recipe.get("instructions", []), 1))
+    if wiki_only:
+        if summary := recipe.get("wiki_summary"):
+            lines.extend(["", "Opis z Wikipédie", summary])
+        lines.extend(["", "Príprava podľa Wikipédie"])
+        lines.extend(recipe.get("instructions") or [])
+    else:
+        lines.extend(["", "Suroviny z Food.com"])
+        lines.extend(f"- {ingredient}" for ingredient in recipe.get("ingredients", []))
+        lines.extend(["", "Postup z Food.com"])
+        lines.extend(f"{step}. {text}" for step, text in enumerate(recipe.get("instructions", []), 1))
     return "\n".join(lines)
 
 
@@ -131,9 +144,9 @@ def compare_queries(root, index, query, method, limit):
         def run_query(text):
             if text.startswith(":id "):
                 identifier = text[4:].strip()
-                if not identifier.isascii() or not identifier.isdecimal():
-                    raise ValueError("Zadaj číselné ID receptu, napríklad :id 2886.")
-                hits = lucene(f"recipe_id:{identifier}", 1)
+                if not re.fullmatch(r"(?:wiki)?[0-9]+", identifier):
+                    raise ValueError("Zadaj ID receptu, napríklad :id 2886 alebo :id wiki123.")
+                hits = lucene(f'recipe_id:"{identifier}"', 1)
                 print(recipe_details(hits[0]) if hits else f"Recept {identifier} sa nenašiel.")
                 return
 
@@ -159,12 +172,16 @@ def compare_queries(root, index, query, method, limit):
         print("Filtre môžeš pridať na koniec dopytu, napríklad pancakes --max-minutes 30 --min-servings 4.")
         while True:
             try:
-                query = input("\nDopyt > ").strip()
+                raw_query = input("\nDopyt > ").strip()
             except (EOFError, KeyboardInterrupt):
                 print()
                 return
-            if not query:
+            if not raw_query:
                 return
+            query = raw_query.translate(UNDECODABLE_INPUT_BYTES).strip()
+            if not query:
+                print("Vstup sa nepodarilo prečítať. Zadaj dopyt znova.")
+                continue
             try:
                 run_query(query)
             except ValueError as error:

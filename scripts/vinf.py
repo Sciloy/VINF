@@ -209,7 +209,8 @@ def main():
     join.add_argument("dump", help="English pages-articles XML or XML.bz2 path")
     join.add_argument("--master", default="local[2]")
     join.add_argument("--indexed", action="store_true",
-                      help="Read candidate pages using the Wikimedia index of a local multistream dump")
+                      help="Find recipe titles and Wikipedia food lists through the Wikimedia title index")
+    join.add_argument("--title-index", type=Path, help="Local multistream title index for --indexed")
     commands.add_parser("lucene-index")
     lucene = commands.add_parser("lucene-search")
     lucene.add_argument("query")
@@ -220,6 +221,9 @@ def main():
     comparison_view.add_argument("query", nargs="?", help="Bez dopytu spustí interaktívny režim")
     comparison_view.add_argument("--method", choices=METHODS, default="smooth")
     comparison_view.add_argument("--limit", type=int, default=5)
+    gui = commands.add_parser("gui", help="Otvoriť vyhľadávanie receptov v prehliadači")
+    gui.add_argument("--bind", default="127.0.0.1")
+    gui.add_argument("--port", type=int, default=8765)
     commands.add_parser("evaluate")
     args = parser.parse_args()
     root = args.root.resolve()
@@ -227,11 +231,14 @@ def main():
     try:
         if args.command == "spark-join":
             from spark_recipes import join_dump
+            if args.title_index and not args.indexed:
+                parser.error("--title-index requires --indexed")
             if args.indexed:
                 from wiki_dump_index import candidate_xml
 
                 source = Path(args.dump).resolve(strict=True)
-                dump = candidate_xml(source, root / "data/processed/recipes.jsonl").as_uri()
+                dump = candidate_xml(source, root / "data/processed/recipes.jsonl",
+                                     index_path=args.title_index).as_uri()
             else:
                 dump = args.dump if "://" in args.dump else Path(args.dump).resolve().as_uri()
             json_output(join_dump(root, dump, args.master))
@@ -245,6 +252,9 @@ def main():
         if args.command == "evaluate":
             from evaluate_recipes import comparison_table
             print(comparison_table(root, load_index(root)))
+        if args.command == "gui":
+            from recipe_gui import serve
+            serve(root, args.bind, args.port)
         if args.command == "compare-search":
             from evaluate_recipes import compare_queries
             compare_queries(root, load_index(root), args.query, args.method, args.limit)

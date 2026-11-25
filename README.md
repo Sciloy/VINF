@@ -1,6 +1,8 @@
-# VINF – recepty z Food.com
+# VINF - vyhľadávanie receptov
 
 Scrapy crawler, REGEX extraktor a vlastné vyhľadávanie s dvoma metódami IDF.
+Apache Spark spája recepty Food.com s článkami z Wikipédie. PyLucene
+indexuje obohatené recepty aj samostatné záznamy z Wikipédie.
 Python 3.10+, overené s Python 3.14. Príkazy sa spúšťajú z koreňa projektu.
 
 ## Vyhľadávanie s hotovými indexmi
@@ -8,6 +10,7 @@ Python 3.10+, overené s Python 3.14. Príkazy sa spúšťajú z koreňa projekt
 V repozitári sú dva hotové indexy. Pôvodný index je v `data/index/index.json`
 a PyLucene index je v `data/part2/lucene/`. Na ich porovnanie stačí spustený
 Docker Desktop. Obraz `coady/pylucene:9.12.0` už obsahuje PyLucene.
+Po zmene spojených dát vytvor aktuálny PyLucene index príkazom `lucene-index`.
 Príkazy zadaj v PowerShelli z koreňa projektu.
 
 ```powershell
@@ -19,6 +22,20 @@ docker run --rm -it --mount $mount -w /vinf --entrypoint python3 $image scripts/
 V porovnaní zadaj napríklad `butter chicken` alebo `tomato soup`.
 Z každého indexu sa zobrazí najviac päť výsledkov. Príkaz `:id 282620`
 otvorí detail receptu. Program pri tomto spustení načíta hotové indexy z disku.
+
+### GUI v prehliadači
+
+Po vytvorení aktualizovaného PyLucene indexu spusti z koreňa projektu:
+
+```powershell
+docker run --rm -p 127.0.0.1:8765:8765 --mount "type=bind,source=$($PWD.Path),target=/vinf,readonly" -w /vinf --entrypoint python3 coady/pylucene:9.12.0 scripts/vinf.py gui --bind 0.0.0.0
+```
+
+Otvor [http://localhost:8765](http://localhost:8765). Vo filtri **Zdroj** vyber
+**Wikipédia** a klikni na **Vyhľadať** aj bez dopytu. Detail obsahuje opis prípravy
+prevzatý z článku, dostupné wiki údaje a odkaz na pôvodnú stránku.
+Pri **Food.com + Wikipédia** detail ukazuje suroviny a postup z Food.com
+a dostupné údaje z priradeného wiki článku. Server ukončíš cez Ctrl+C.
 
 ### Číselné filtre
 
@@ -40,12 +57,27 @@ namiesto `compare-search`. Pôvodný TF-IDF index sa tvorí príkazom
 `python scripts/vinf.py index`.
 
 Na zopakovanie spojenia použi Java 17, PySpark 4.1.2 a zodpovedajúci
-XML dump anglickej Wikipédie. Prepínač `--indexed` načíta relevantné
-bloky dumpu pomocou sprievodného indexu Wikimedia.
+XML dump anglickej Wikipédie. Prepínač `--indexed` pomocou sprievodného
+indexu Wikimedia načíta kandidátov podľa názvov receptov a podľa odkazov
+v zoznamoch jedál Wikipédie. Ak máš zodpovedajúci lokálny index pod iným
+názvom, zadaj jeho cestu cez `--title-index`.
+V čerstvom virtuálnom prostredí nainštaluj PySpark cez
+`.\.venv\Scripts\python.exe -m pip install pyspark==4.1.2`.
 
 ```powershell
-python -m pip install pyspark==4.1.2
-python scripts/vinf.py spark-join data/wiki/enwiki-20261101-pages-articles-multistream.xml.bz2 --indexed
+$wiki = 'data/wiki/enwiki-20261101-pages-articles-multistream.xml.bz2'
+$titleIndex = 'data/wiki/9aa04cdaf3b5b7f78d1f28b3c19c0bcc05b7611c.index.txt.bz2'
+.\.venv\Scripts\python.exe scripts/vinf.py spark-join $wiki --indexed --title-index $titleIndex
+$mount = "type=bind,source=$($PWD.Path),target=/vinf"
+docker run --rm --mount $mount -w /vinf --entrypoint python3 coady/pylucene:9.12.0 scripts/vinf.py lucene-index
+```
+
+Spark vypíše `wikipedia_only` (nové záznamy výlučne z Wikipédie),
+`matched` (obohatené recepty Food.com) a `recipes` (celkový počet po spojení).
+Overenie vzorky aj celého dumpu:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/check_part2.py --full --dump $wiki --indexed --title-index $titleIndex
 ```
 
 ## Inštalácia crawlera

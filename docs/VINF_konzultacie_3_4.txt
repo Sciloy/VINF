@@ -1,0 +1,167 @@
+====== Konzultácia 3 – Spracovanie veľkých dát ======
+
+===== Vstupné dáta =====
+
+Z prvého odovzdania mám **5 011 receptov z Food.com** v súbore ''data/processed/recipes.jsonl''. Každý riadok obsahuje jeden recept s ID, názvom, surovinami a postupom.
+
+Druhým vstupom je anglický XML dump Wikipédie z 1. 11. 2026 uložený v ''data/wiki/enwiki-20261101-pages-articles-multistream.xml.bz2''. Z dumpu pripájam údaje k receptom Food.com a dopĺňam aj jedlá, ku ktorým v korpuse Food.com nebola nájdená zhoda.
+
+[[https://dumps.wikimedia.org/enwiki/latest/|Anglický dump Wikipédie a sprievodné súbory]]
+
+===== Výber stránok z dumpu =====
+
+Na hľadanie článku používam názov receptu, jeho upravenú verziu bez dodatkov ako „Easy“ a názov známej rodiny jedla. Rodiny z konzultácie 2b tu slúžia na to, aby sa rôzne recepty na to isté jedlo dali spojiť s jedným článkom. Napríklad pri názve ''Fluffy Pancakes'' pravidlo pre lievance pridá medzi možné názvy článok ''Pancake''. Názvy prevádzam na malé písmená a zjednocujem medzery, aby sa dali porovnať.
+
+Sprievodný súbor Wikimedia obsahuje názvy wiki stránok, ich ID a pozície komprimovaných blokov v dumpe. Keď pravidlo navrhne ''Pancake'', podľa názvu v sprievodnom súbore nájdem blok s touto stránkou. Zo stiahnutého dumpu načítam príslušný blok a vybranú stránku zapíšem do menšieho XML súboru. Pri presmerovaní dohľadám aj stránku, na ktorú odkazuje. Sprievodný súbor teda používam pri čítaní dumpu. Názvy, ktoré pre daný recept hľadám, určuje funkcia ''recipe_candidates()''.
+
+Pravidlá sú v ''scripts/wiki_matching.py''. Výber blokov a vytvorenie XML je v ''scripts/wiki_dump_index.py'', vo funkcii ''candidate_xml()''.
+
+Na objavovanie ďalších jedál prečítam z rovnakého dumpu aj 14 zoznamov, napríklad ''List of soups'', ''List of stews'' a ''List of dumplings''. Z ich obsahu získam odkazy na články. Tieto názvy vyhľadám v sprievodnom indexe Wikimedia rovnako ako názvy kandidátov z Food.com. Tým vznikne druhá skupina kandidátov nezávislá od receptov na Food.com.
+
+===== Spracovanie v Apache Spark =====
+
+Spark načíta recepty zo súboru JSONL a predvybrané wiki stránky z XML. Z XML číta ID, názov, menný priestor a text článku. V hlavnom mennom priestore (''ns = 0'') vyberie stránky podľa názvov kandidátov Food.com alebo podľa prítomnosti šablóny ''Infobox food''. Text vybraných stránok spracuje Python v hlavnom procese. Spark potom načíta vyčistené údaje a vykoná spojenie.
+
+**Tok dát**\\
+''data/processed/recipes.jsonl'' + wiki dump → výber wiki stránok → extrakcia wiki údajov → spojenie v Sparku → ''data/part2/recipes.jsonl''.
+
+Kód spracovania a spojenia je v ''scripts/spark_recipes.py'', vo funkcii ''join_dump()''.
+
+===== REGEX extrakcia wiki údajov =====
+
+Funkcia ''food_fields()'' v ''scripts/wiki_fields.py'' vyhľadá vo wikitexte šablónu ''Infobox food''. Vlastné regexy z nej vyberú dostupné polia a očistia ich od značiek odkazov a referencií. V ''scripts/wiki_matching.py'' regex rozpozná aj presmerovanie v tvare <nowiki>#REDIRECT [[Cieľový článok]]</nowiki>. Pri článku bez infoboxu pravidlá kontrolujú úvod alebo kategórie, aby sa dal použiť aj článok, ktorý opisuje jedlo bez tejto šablóny.
+
+^ Údaj z Wikipédie ^ Na čo slúži ^
+| Názov a ID článku | Odkaz v detaile receptu. Podľa ID počítam unikátne články. |
+| Krajina a región | Pôvod jedla uvedený v článku. |
+| Kuchyňa | Jeden zo zdrojov pre vyhľadávanie podľa kuchyne. |
+| Typ jedla | Zaradenie ako polievka, dezert a podobne. |
+| Typické suroviny | Samostatné vyhľadávanie v údajoch z článku. Pri zázname z Food.com sa zobrazujú vedľa surovín konkrétneho receptu. |
+| Opis a príprava | Pri samostatnom wiki zázname zobrazím úvodný opis a text zo sekcie o príprave alebo vetu o príprave z úvodu článku. |
+
+Funkcia ''wiki_recipe_text()'' vyhľadáva sekcie ako ''Preparation'', ''Cooking'' alebo ''Recipe''. Ak ich článok nemá, skúša úvodné vety s výrazmi opisujúcimi prípravu, napríklad ''boiled'', ''mixed'' alebo ''fried''. Odstráni wiki značky a citácie. Dĺžka opisu závisí od článku. Čas, počet porcií a množstvá surovín sa dopĺňajú iba vtedy, ak pochádzajú zo vstupného receptu Food.com.
+
+===== Spojenie receptov s článkami =====
+
+Prvé spojenie porovná navrhnutý názov a názov wiki stránky cez pole ''key''. V oboch tabuľkách je to názov po úprave písmen a medzier. Kandidát na obohatenie môže mať infobox alebo môže byť rozpoznaný podľa úvodu či kategórie článku.
+
+Ak k receptu nájdem viac článkov, rozhodne poradie pravidiel. Priame zhody s infoboxom majú prednosť pred voľnejšími zhodami. Pri presmerovaní sa uloží ID a názov cieľového článku. Na jeden recept pripadne najviac jeden článok.
+
+Ku každému receptu Food.com najprv priradím vybrané ID wiki článku podľa ''recipe_id''. Tieto recepty potom spojím s wiki článkami podľa ''wiki_id'' cez **full outer join**. Vo výsledku sú recepty bez priradeného článku, recepty obohatené o wiki údaje aj wiki záznamy bez zhody na Food.com.
+
+<code python>
+joined = recipes.join(best, "recipe_id", "left").join(inputs, "wiki_id", "full_outer")
+</code>
+
+Samostatný záznam pridám, keď má článok ''Infobox food'', našiel sa v ňom text o príprave a jeho ID nepatrí medzi zhody s Food.com. Kontrolujem aj články, ktoré pri výbere najlepšej zhody skončili za iným kandidátom. Presmerovania používajú ID cieľového článku. Samostatný záznam má predponu ''wiki'' pred ID stránky a odkaz na článok. Napríklad ''wiki47850008'' označuje ''Khao soi''.
+
+^ Recept z Food.com ^ Priradený článok ^ Dôvod priradenia ^
+| Fluffy Pancakes | Pancake | Pravidlo podľa názvu rozpozná rodinu lievancov. |
+| [[https://www.food.com/recipe/ground-beef-and-potatoes-oh-so-simple-282620|Ground Beef and Potatoes]] | [[https://en.wikipedia.org/?curid=517563|Hash (food)]] | Mleté hovädzie a zemiaky sú v názve aj v surovinách. Postup uvádza prípravu na panvici. Článok sa zobrazí ako súvisiace jedlo a pôvod receptu zostane prázdny. |
+
+===== Výsledky párovania =====
+
+^ Údaj ^ Počet ^
+| Recepty z Food.com na vstupe | 5 011 |
+| Recepty Food.com s pripojeným článkom | 2 198 |
+| Recepty iba z Food.com | 2 813 |
+| Rôzne wiki články pripojené k Food.com | 313 |
+| **Nové záznamy iba z Wikipédie** | **970** |
+| **Celkový počet záznamov po spojení** | **5 981** |
+
+^ Typ priradenia ^ Počet receptov ^
+| Rodina jedla | 1 306 |
+| Presmerovanie | 800 |
+| Presný názov | 81 |
+| Upravený názov | 10 |
+| Súvisiace jedlo | 1 |
+
+Na jeden článok môže odkazovať viac receptov. Počet samostatných wiki záznamov vychádza z prehľadaných zoznamov a z použitých podmienok na zaradenie článku. Spark vypíše tento počet v položke ''wikipedia_only''. Súbor ''data/part2/recipes.jsonl'' obsahuje výstup spojenia a slúži ako vstup pre konzultáciu 4.
+
+===== Spustenie spracovania =====
+
+Príkaz spustím v PowerShelli z koreňa projektu s PySpark 4.1.2 a zapnutým Docker Desktop. Parameter ''--dump'' ukazuje na už stiahnutý dump. ''--indexed'' zapne výber stránok podľa sprievodného indexu Wikimedia, ktorého cestu zadám cez ''--title-index''. Skript overí vzorku, následne celý korpus a dopyty nad PyLucene indexom.
+
+<code powershell>
+$wiki = 'data/wiki/enwiki-20261101-pages-articles-multistream.xml.bz2'
+$titleIndex = 'data/wiki/9aa04cdaf3b5b7f78d1f28b3c19c0bcc05b7611c.index.txt.bz2'
+.\.venv\Scripts\python.exe -u scripts/check_part2.py --full --indexed --dump $wiki --title-index $titleIndex
+</code>
+
+Úspešný plný beh končí riadkom ''PASS'' s cestou ''data/part2/test-results.json''.
+
+====== Konzultácia 4 – Lucene index ======
+
+===== Vytvorenie indexu =====
+
+Na výstup zo Sparku nadväzuje príkaz ''lucene-index'' v ''scripts/vinf.py''. Funkcia ''build()'' v ''scripts/lucene_recipes.py'' číta ''data/part2/recipes.jsonl'' a z každého receptu vytvorí jeden Lucene dokument. Názov, suroviny, postup a údaje z Wikipédie majú samostatné polia. Podľa potreby tak môžem hľadať napríklad len v názve alebo len v surovinách.
+
+''StandardAnalyzer'' rozdelí text na slová a prevedie ich na malé písmená. ''IndexWriter'' vytvorí index v ''data/part2/lucene/''. Po indexovaní celého výstupu zo Sparku bude index obsahovať **5 981 dokumentov**, z toho **970 samostatných z Wikipédie**.
+
+===== Polia indexu =====
+
+^ Pole ^ Typ v Lucene ^ Na čo slúži ^
+| ''recipe_id'' | ''StringField'' s uloženou hodnotou | Presné vyhľadanie receptu podľa ID. |
+| ''source'' | ''StringField'' | Filtrovanie podľa pôvodu záznamu. Hodnoty sú ''foodcom'', ''both'' a ''wikipedia''. |
+| ''title'' | ''TextField'' | Hľadanie v názve. Pri bežnom dopyte má zhoda v názve vyššiu váhu. |
+| ''ingredients'' | ''TextField'' | Hľadanie slov alebo fráz v surovinách receptu z Food.com. |
+| ''instructions'' | ''TextField'' | Hľadanie v krokoch z Food.com alebo v opise prípravy z wiki článku. |
+| ''wiki_title'' | ''TextField'' | Hľadanie podľa názvu priradeného wiki článku. |
+| ''country'', ''region'' | ''TextField'' | Hľadanie podľa krajiny alebo regiónu z Wikipédie. |
+| ''cuisine'', ''type'' | ''TextField'' | Hľadanie podľa kuchyne alebo typu jedla uvedeného v článku. |
+| ''wiki_ingredients'' | ''TextField'' | Hľadanie podľa typických surovín uvedených v článku. |
+| ''cuisine_hint'' | ''StringField'' | Hľadanie podľa jednotného označenia kuchyne, napríklad ''italian''. |
+| ''total_time_minutes'', ''servings'' | ''DoublePoint'' | Číselný filter podľa času alebo počtu porcií. |
+| ''recipe'' | ''StoredField'' s JSON záznamom | Zobrazenie celého receptu s URL, surovinami, postupom a wiki údajmi. |
+
+Pri dopyte ''taliansky recept'' aplikácia hľadá ''cuisine_hint:italian''. Označenie kuchyne dopĺňajú pravidlá v ''scripts/cuisine_hints.py''. Vychádzajú z Wikipédie, názvu, kategórie Food.com alebo rodiny jedla. Preto môže vyhľadávanie nájsť aj recept bez wiki článku, ak jeho názov alebo rodina obsahuje napríklad ''lasagna''. V detaile receptu je uvedené, podľa čoho sa kuchyňa určila.
+
+===== Vyhľadávanie a typy dopytov =====
+
+Pri dopyte aplikácia otvorí hotový index. ''MultiFieldQueryParser'' prevedie zadaný text na Lucene dopyt a ''IndexSearcher'' vyhľadá výsledky zoradené podľa BM25. Skóre zohľadňuje výskyt a zriedkavosť hľadaných slov aj dĺžku poľa. Pre bežný dopyt ako ''tomato soup'' vyžadujem obe slová. Zhodám v názve dávam vyššiu váhu a ešte viac zvýhodňujem presnú frázu v názve. Pravidlo je vo funkcii ''ranked_query()'' v ''scripts/lucene_recipes.py''.
+
+^ Typ ^ Príklad ^ Výsledok ^
+| Textový | ''tomato soup'' | Recepty s oboma slovami v textových poliach. Zhoda v názve má vyššiu váhu. |
+| Frázový | ''title:"tomato soup"'' | Názvy, v ktorých slová ''tomato'' a ''soup'' nasledujú za sebou. |
+| Boolean AND | ''ingredients:chicken AND ingredients:rice'' | Obe slová sa musia nachádzať v surovinách. Podmienku ''rice'' spĺňa aj ''rice vinegar''. |
+| Boolean OR | ''ingredients:chicken OR ingredients:tofu'' | V surovinách musí byť aspoň jedno z uvedených slov. |
+| Rozsahový filter | ''lucene-search pancakes --max-minutes 30'' | Výsledky dopytu ''pancakes'' s časom najviac 30 minút. Parameter ''--min-servings'' určuje minimálny počet porcií. |
+| Podľa ID | ''recipe_id:282620'' | Konkrétny recept s daným ID. |
+| Podľa zdroja | ''source:wikipedia'' | Samostatné záznamy z Wikipédie. |
+
+===== Porovnanie s vlastným indexom z konzultácie 2b =====
+
+Pôvodný index v ''data/index/index.json'' vyhľadáva nad spojeným textom názvu, surovín a postupu. Výsledky zoraďuje podľa kosínusovej podobnosti TF-IDF. Tabuľka zachytáva poradie z porovnania metódy ''smooth'' s PyLucene nad pôvodnými 5 011 receptmi. Zahrnutie samostatných wiki záznamov môže zmeniť poradie BM25.
+
+^ Dopyt ^ Poradie ^ Pôvodný index – TF-IDF (smooth) ^ Nový index – PyLucene ^
+| tomato soup | 1. | Yum-a-setta | **Tomato and Barley Soup** |
+| tomato soup | 2. | Pepsi Pork Roast | Yum-a-setta |
+| tomato soup | 3. | Awesome Slow Cooker Pot Roast | Easy Beef Macaroni |
+| butter chicken | 1. | 15 Minute Garlic Lemon Chicken | **Butter Chicken** |
+| butter chicken | 2. | Baked Chicken | Indian Butter Chicken (482614) |
+| butter chicken | 3. | Simple Chicken Bake | Indian Butter Chicken (86753) |
+
+V tomto meraní dopyt ''tomato soup'' vrátil na prvom mieste paradajkovú polievku s jačmeňom. Pri ''butter chicken'' sa v prvých troch výsledkoch zobrazilo hľadané jedlo a dva jeho varianty. Prvý výsledok mal z Wikipédie aj región ''Delhi'' a označenie kuchyne ''indian''.
+
+===== GUI a zdroje údajov =====
+
+Príkaz ''gui'' otvorí lokálne webové rozhranie na adrese ''http://localhost:8765''. Vo výsledkoch aj v detaile uvádza zdroj ''Food.com'', ''Food.com + Wikipédia'' alebo ''Wikipédia''. Pri receptoch Food.com zobrazí suroviny a kroky z Food.com a dostupné údaje z priradeného článku. Pri samostatných wiki záznamoch zobrazí pôvodný článok, dostupné údaje z infoboxu, opis jedla a úryvky o príprave. Výberom ''Wikipédia'' vo filtri ''Zdroj'' zobrazím samostatné wiki záznamy aj bez textového dopytu.
+
+<code powershell>
+docker run --rm -p 127.0.0.1:8765:8765 --mount "type=bind,source=$($PWD.Path),target=/vinf,readonly" -w /vinf --entrypoint python3 coady/pylucene:9.12.0 scripts/vinf.py gui --bind 0.0.0.0
+</code>
+
+===== Spustenie aplikácie a GitHub =====
+
+V ''scripts/vinf.py'' sú príkazy ''lucene-index'' na vytvorenie indexu, ''lucene-search'' na vyhľadávanie a ''compare-search'' na zobrazenie oboch indexov vedľa seba. Porovnávací režim je v ''scripts/evaluate_recipes.py''.
+
+Porovnanie spustím v PowerShelli z koreňa projektu so zapnutým Docker Desktop. Používa hotový pôvodný index ''data/index/index.json'' a nový index v ''data/part2/lucene/''.
+
+<code powershell>
+$mount = "type=bind,source=$((Get-Location).Path),target=/vinf"
+docker run --rm -it --mount $mount -w /vinf --entrypoint python3 coady/pylucene:9.12.0 scripts/vinf.py compare-search
+</code>
+
+Do riadka ''Dopyt >'' zadám napríklad ''butter chicken''. Príkazom '':id 282620'' otvorím detail receptu vrátane surovín, postupu a wiki odkazu.
+
+[[https://github.com/Sciloy/VINF|GitHub – VINF]]
